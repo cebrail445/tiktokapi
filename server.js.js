@@ -1,8 +1,12 @@
 const express = require('express');
 const axios = require('axios');
+const cors = require('cors'); // 1. CORS paketi dahil edildi
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+
+// 2. CORS middleware aktif edildi (Tüm tarayıcı isteklerine izin verir)
+app.use(cors());
 
 app.get('/api/download', async (req, res) => {
     const tiktokUrl = req.query.url;
