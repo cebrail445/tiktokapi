@@ -7,13 +7,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 
-// İstekleri tarayıcı gibi gösteren gelişmiş headers
+// Tarayıcı taklidi yapan profesyonel headers
 const browserHeaders = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-    'Cache-Control': 'no-cache',
-    'Pragma': 'no-cache'
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
 };
 
 app.get('/api/download', async (req, res) => {
@@ -29,45 +27,46 @@ app.get('/api/download', async (req, res) => {
     try {
         let finalUrl = tiktokUrl;
 
-        // Eğer gelen link kısaysa, TikTok'un engelini aşmak için alternatif yönlendirme yakalayıcı kullanıyoruz
+        // Kısa link ise Render IP engeline takılmamak için alternatif ve güvenli unshorten yöntemi
         if (tiktokUrl.includes('vt.tiktok.com') || tiktokUrl.includes('vm.tiktok.com')) {
             try {
-                // Axios maxRedirects ile yönlendirmeyi takip etmeye çalışır
-                const redirectRes = await axios.get(tiktokUrl, {
-                    maxRedirects: 5,
-                    headers: browserHeaders,
-                    validateStatus: function (status) {
-                        return status >= 200 && status < 403; // Yönlendirme kodlarını kabul et
-                    }
+                // Alternatif hafif bir yönlendirme servisi üzerinden gerçek linki çözüyoruz
+                const unshortenRes = await axios.get(`https://unshorten.me/json/${encodeURIComponent(tiktokUrl)}`, {
+                    timeout: 5000
                 });
-                
-                // Eğer nihai URL bulunduysa onu al
-                if (redirectRes.request && redirectRes.request.res && redirectRes.request.res.responseUrl) {
-                    finalUrl = redirectRes.request.res.responseUrl;
+                if (unshortenRes.data && unshortenRes.data.resolved_url) {
+                    finalUrl = unshortenRes.data.resolved_url;
                 }
-            } catch (redirError) {
-                // Axios redirect'te takılsa bile error nesnesinin içinde responseUrl kalmış olabilir
-                if (redirError.response && redirError.response.request && redirError.response.request.res && redirError.response.request.res.responseUrl) {
-                    finalUrl = redirError.response.request.res.responseUrl;
+            } catch (err) {
+                // Eğer unshorten servisi yanıt vermezse kendi yönlendirme denememize geçiyoruz
+                try {
+                    const directRes = await axios.get(tiktokUrl, {
+                        maxRedirects: 5,
+                        headers: browserHeaders,
+                        validateStatus: (status) => status >= 200 && status < 405
+                    });
+                    if (directRes.request && directRes.request.res && directRes.request.res.responseUrl) {
+                        finalUrl = directRes.request.res.responseUrl;
+                    }
+                } catch (e) {
+                    // Çözülemezse orijinal linkle devam etmeyi dene
+                    finalUrl = tiktokUrl;
                 }
             }
         }
 
         console.log("İşlenen Nihai URL:", finalUrl);
 
-        // TikWM API'sine çözülmüş veya orijinal linki gönderiyoruz
+        // TikWM API'sine istek atıyoruz
         const targetApi = `https://www.tikwm.com/api/?url=${encodeURIComponent(finalUrl)}`;
-        
-        const response = await axios.get(targetApi, {
-            headers: browserHeaders
-        });
+        const response = await axios.get(targetApi, { headers: browserHeaders });
         
         return res.json(response.data);
     } catch (error) {
         console.error("İstek hatası:", error.message);
         return res.status(500).json({ 
             status: "error", 
-            message: "Sunucu hatası: TikTok bağlantısı engellendi veya geçersiz link." 
+            message: "Sunucu hatası: Kısa link çözülemedi, lütfen uzun link deneyin usta." 
         });
     }
 });
