@@ -34,5 +34,5 @@ app.get('/api/download', async (req, res) => {
 }); // <-- Buradaki kapatma parantezi eksikti, eklendi!
 
 app.listen(PORT, () => {
-    console.log(`API sunucumuz ${PORT} portunda arı gibi çalışıyor usta! 🚀`);
+    console.log(`API sunucumuz ${PORT} portunda arı gibi çalışıyor usta! 🚀`); 
 });
