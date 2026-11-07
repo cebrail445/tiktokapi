@@ -1,12 +1,25 @@
 const express = require('express');
 const axios = require('axios');
-const cors = require('cors'); // 1. CORS paketi dahil edildi
+const cors = require('cors');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
 
-// 2. CORS middleware aktif edildi (Tüm tarayıcı isteklerine izin verir)
 app.use(cors());
+
+// Kısa linkleri (vt.tiktok.com vb.) gerçek TikTok adresine çeviren fonksiyon
+async function expandUrl(inputUrl) {
+    try {
+        const response = await axios.get(inputUrl, {
+            maxRedirects: 5,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+        });
+        // Axios yönlendirmeleri takip eder ve son URL'yi buruşur
+        return response.request.res.responseUrl || inputUrl;
+    } catch (error) {
+        return inputUrl; // Hata olursa orijinalini döndür
+    }
+}
 
 app.get('/api/download', async (req, res) => {
     const tiktokUrl = req.query.url;
@@ -19,10 +32,15 @@ app.get('/api/download', async (req, res) => {
     }
 
     try {
-        const targetApi = `https://www.tikwm.com/api/?url=${encodeURIComponent(tiktokUrl)}`;
+        // 1. Adım: Kısa linkse gerçek adrese genişlet
+        const resolvedUrl = await expandUrl(tiktokUrl);
+
+        // 2. Adım: Gerçek adresi TikWM API'sine gönder
+        const targetApi = `https://www.tikwm.com/api/?url=${encodeURIComponent(resolvedUrl)}`;
         const response = await axios.get(targetApi, {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
         });
+        
         return res.json(response.data);
     } catch (error) {
         console.error("İstek hatası:", error.message);
@@ -31,8 +49,8 @@ app.get('/api/download', async (req, res) => {
             message: "Sunucu tarafında veri çekilirken hata oluştu usta." 
         });
     }
-}); // <-- Buradaki kapatma parantezi eksikti, eklendi!
+});
 
 app.listen(PORT, () => {
-    console.log(`API sunucumuz ${PORT} portunda arı gibi çalışıyor usta! 🚀`); 
+    console.log(`API sunucumuz ${PORT} portunda arı gibi çalışıyor usta! 🚀`);
 });
