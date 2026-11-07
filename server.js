@@ -1,11 +1,31 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const https = require('https');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+
+// Kısa linkleri native https modülü ile kesin olarak çözen fonksiyon
+function resolveTikTokUrl(url) {
+    return new Promise((resolve) => {
+        if (!url.includes('tiktok.com')) {
+            return resolve(url);
+        }
+
+        https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }, (res) => {
+            if (res.headers.location) {
+                resolve(res.headers.location);
+            } else {
+                resolve(url);
+            }
+        }).on('error', () => {
+            resolve(url);
+        });
+    });
+}
 
 app.get('/api/download', async (req, res) => {
     const tiktokUrl = req.query.url;
@@ -18,9 +38,12 @@ app.get('/api/download', async (req, res) => {
     }
 
     try {
-        // Kısa linkleri veya normal linkleri doğrudan TikWM'ye yolluyoruz, 
-        // çünkü TikWM kendi içinde kısa linkleri zaten çözebiliyor.
-        const targetApi = `https://www.tikwm.com/api/?url=${encodeURIComponent(tiktokUrl)}`;
+        // 1. Kısa linki gerçek TikTok adresine çevir
+        const longUrl = await resolveTikTokUrl(tiktokUrl);
+        console.log("Çözülen URL:", longUrl);
+
+        // 2. Gerçek adresi TikWM API'sine gönder
+        const targetApi = `https://www.tikwm.com/api/?url=${encodeURIComponent(longUrl)}`;
         
         const response = await axios.get(targetApi, {
             headers: { 
