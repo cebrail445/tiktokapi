@@ -31,7 +31,7 @@ app.get('/api/download', async (req, res) => {
             message: "Sunucu tarafında veri çekilirken hata oluştu usta." 
         });
     }
-
+}); // <-- Buradaki kapatma parantezi eksikti, eklendi!
 
 app.listen(PORT, () => {
     console.log(`API sunucumuz ${PORT} portunda arı gibi çalışıyor usta! 🚀`);
